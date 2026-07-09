@@ -6,7 +6,7 @@ export async function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve , ms));
 }
 
-export async function acquire_Lock(max_attempts = 10){
+export async function acquireLock(max_attempts = 10){
     let attempts = 0;
     let base_sleep = 5;
     while(attempts <= max_attempts){
