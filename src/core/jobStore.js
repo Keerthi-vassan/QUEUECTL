@@ -1,8 +1,9 @@
 import { acquireLock,releaseLock } from "./lock.js";
 import { createJob as buildJob } from "./job.js";
 import {readFile ,writeFile} from "fs/promises"
+import { nextAttemptTimestamp } from "./backoff.js";
 
-const data_path = './data/jobs.json'
+const data_path = './data/jobs.json';
 
 async function readJobsFile() {
 
@@ -59,11 +60,12 @@ export async function getJob(id) {
 export async function claimJob(workerId){
     await acquireLock();
     let claimedJob = null;
+    const now = Date.now();
     try{
         let jobs = await readJobsFile();
         let jobsList = Object.values(jobs);
 
-        let currJob = jobsList.find(job => job.state === 'pending');
+        let currJob = jobsList.find(job => job.state === 'pending' || job.state ==='failed' && new Date(job.next_attempt).getTime()  <= now);
 
         if(!currJob) return null;
 
@@ -78,4 +80,55 @@ export async function claimJob(workerId){
     }
 
     return claimedJob;
+}
+
+export async function completeJob(id){
+    await acquireLock();
+    let job = null;
+    try{
+        let jobs = await readJobsFile();
+        job = jobs[id];
+        if(!job) throw new Error(`Job ${id} not found`)
+            
+
+        job.state = 'completed';
+        job.updated_at = new Date().toISOString();
+
+        let new_jobs = {...jobs , [job.id] : job};
+        await writeJobsFile(new_jobs);
+    }finally{
+        await releaseLock();
+    }
+
+    return job;
+}
+
+export async function failJob(id , errorMessage){
+    await acquireLock();
+    let job = null;
+    const base = 2;
+    try{
+        let jobs = await readJobsFile()
+        job = jobs[id];
+        if(!job) throw new Error(`Job ${id} not found`)
+        
+        job.attempts++;
+
+        if(job.attempts >= job.max_retries) {
+            job.state = 'dead';
+        }else{
+            job.state = 'failed';
+            job.next_attempt = nextAttemptTimestamp(job.attempts , base);
+        }
+
+        job.updated_at = new Date().toISOString();
+        job.last_error = errorMessage;
+
+        let new_jobs = {...jobs , [job.id] : job};
+        await writeJobsFile(new_jobs);
+    }finally{
+        await releaseLock();
+    }
+
+    return job;
 }
