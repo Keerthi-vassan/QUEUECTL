@@ -12,23 +12,32 @@ function sleep(ms) {
 }
 
 async function runJob(job) {
-  console.log(`running job`);
-  console.log(`${job.id} , command : ${job.command} , status : ${job.state}`);
-  try {
-    let res = await exec(job.command);
-    await completeJob(job.id , res.stdout.trim());
-  } catch (err) {
-    await failJob(job.id, err.message, err.stderr?.trim());
-  }
-
-  console.log(`finished processing job ${job.id}`);
+    console.log(`running job`);
+    console.log(` id : ${job.id} , command : ${job.command} , status : ${job.state}`);
+    try {
+        let res = await exec(job.command);
+        await completeJob(job.id , res.stdout.trim());
+    } catch (err) {
+        await failJob(job.id, err.message, err.stderr?.trim());
+    }
+    
+    console.log(`finished processing job ${job.id}`);
 }
+
+let shuttingdown = false;
+
+function handleShutdown(signal){
+    console.log(`[${workerId}] recieved a ${signal} , will exit after the current job finishes processing...`);
+    shuttingdown = true
+}
+
+process.on('SIGTERM' , () => handleShutdown('SIGTERM'));
+process.on('SIGINT' , () => handleShutdown('SIGINT'));
 
 async function mainLoop() {
   console.log(`[${workerId}] started, polling for jobs...`);
 
-  while (true) {
-    // TODO: replace with a condition tied to shutdown signal, next step
+  while (!shuttingdown) {
     const job = await claimJob(workerId);
 
     if (!job) {
@@ -38,6 +47,9 @@ async function mainLoop() {
 
     await runJob(job);
   }
+
+  console.log(`[${workerId}] shut down cleanly`);
+  process.exit(0);
 }
 
 mainLoop();
