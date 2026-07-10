@@ -82,7 +82,7 @@ export async function claimJob(workerId){
     return claimedJob;
 }
 
-export async function completeJob(id){
+export async function completeJob(id, output){
     await acquireLock();
     let job = null;
     try{
@@ -94,6 +94,11 @@ export async function completeJob(id){
         job.state = 'completed';
         job.updated_at = new Date().toISOString();
 
+        if(output !== undefined){
+            job.output = output;
+        }
+
+
         let new_jobs = {...jobs , [job.id] : job};
         await writeJobsFile(new_jobs);
     }finally{
@@ -103,7 +108,7 @@ export async function completeJob(id){
     return job;
 }
 
-export async function failJob(id , errorMessage){
+export async function failJob(id , errorMessage, output){
     await acquireLock();
     let job = null;
     const base = 2;
@@ -123,6 +128,10 @@ export async function failJob(id , errorMessage){
 
         job.updated_at = new Date().toISOString();
         job.last_error = errorMessage;
+
+        if (output !== undefined) {
+            job.output = output;
+        }
 
         let new_jobs = {...jobs , [job.id] : job};
         await writeJobsFile(new_jobs);
