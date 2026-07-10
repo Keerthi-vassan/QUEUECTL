@@ -141,3 +141,20 @@ export async function failJob(id , errorMessage, output){
 
     return job;
 }
+
+export async function listJobs({ state } = {}) {
+  await acquireLock();
+  try {
+    const jobs = await readJobsFile();
+    const all = Object.values(jobs);
+    let jobList;
+    if(state){
+        jobList = all.filter(j => j.state === state);
+    }else{
+        jobList = all;
+    }
+    return jobList;
+  } finally {
+    await releaseLock();
+  }
+}
