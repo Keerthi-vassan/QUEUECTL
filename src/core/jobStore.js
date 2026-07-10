@@ -158,3 +158,23 @@ export async function listJobs({ state } = {}) {
     await releaseLock();
   }
 }
+
+export async function retryFromDLQ(id) {
+  await acquireLock();
+  let job = null;
+  try {
+    let jobs = await readJobsFile();
+    job = jobs[id];
+    if (!job) throw new Error(`Job ${id} not found`);
+    if(job.state !== 'dead') throw new Error(`the job ${id} is not dead yet : (current_state : ${job.state})`);
+    job.state = 'pending';
+    job.attempts = 0;
+    delete job.next_attempt;
+    job.updated_at = new Date().toISOString();
+    
+    await writeJobsFile(jobs);
+  } finally {
+    await releaseLock();
+  }
+  return job;
+}
