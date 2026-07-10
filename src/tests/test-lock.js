@@ -1,5 +1,5 @@
 // test-lock.js — temporary, delete once you trust lock.js
-import { acquireLock, releaseLock, sleep } from './core/lock.js';
+import { acquireLock, releaseLock, sleep } from '../core/lock.js';
 
 async function fakeWorker(name) {
   console.log(`${name}: trying to acquire lock...`);
