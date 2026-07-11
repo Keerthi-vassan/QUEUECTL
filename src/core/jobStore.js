@@ -4,6 +4,7 @@ import {readFile ,writeFile} from "fs/promises"
 import { nextAttemptTimestamp } from "./backoff.js";
 
 const data_path = './data/jobs.json';
+const JOBS_LOCK_PATH = './data/jobs.json.lock'
 
 async function readJobsFile() {
 
@@ -29,7 +30,7 @@ async function writeJobsFile(jobs){
 }
 
 export async function createJob(input) {
-   await acquireLock();
+   await acquireLock(JOBS_LOCK_PATH);
    let new_job;
    try{
         new_job =  buildJob(input);
@@ -40,25 +41,25 @@ export async function createJob(input) {
         await writeJobsFile(new_jobs)
 
    }finally{
-        await releaseLock();
+        await releaseLock(JOBS_LOCK_PATH);
    } 
 
    return new_job;
 }
 
 export async function getJob(id) {
-    await acquireLock();
+    await acquireLock(JOBS_LOCK_PATH);
     try{
         let jobs = await readJobsFile();
         return jobs[id] ?? null;
     }finally{
-        await releaseLock();
+        await releaseLock(JOBS_LOCK_PATH);
     }
 }
 
 
 export async function claimJob(workerId){
-    await acquireLock();
+    await acquireLock(JOBS_LOCK_PATH);
     let claimedJob = null;
     const now = Date.now();
     try{
@@ -76,14 +77,14 @@ export async function claimJob(workerId){
         claimedJob = currJob;
         await writeJobsFile(jobs);
     }finally{
-        await releaseLock();
+        await releaseLock(JOBS_LOCK_PATH);
     }
 
     return claimedJob;
 }
 
 export async function completeJob(id, output){
-    await acquireLock();
+    await acquireLock(JOBS_LOCK_PATH);
     let job = null;
     try{
         let jobs = await readJobsFile();
@@ -102,14 +103,14 @@ export async function completeJob(id, output){
         let new_jobs = {...jobs , [job.id] : job};
         await writeJobsFile(new_jobs);
     }finally{
-        await releaseLock();
+        await releaseLock(JOBS_LOCK_PATH);
     }
 
     return job;
 }
 
 export async function failJob(id , errorMessage, output){
-    await acquireLock();
+    await acquireLock(JOBS_LOCK_PATH);
     let job = null;
     const base = 2;
     try{
@@ -136,14 +137,14 @@ export async function failJob(id , errorMessage, output){
         let new_jobs = {...jobs , [job.id] : job};
         await writeJobsFile(new_jobs);
     }finally{
-        await releaseLock();
+        await releaseLock(JOBS_LOCK_PATH);
     }
 
     return job;
 }
 
 export async function listJobs({ state } = {}) {
-  await acquireLock();
+  await acquireLock(JOBS_LOCK_PATH);
   try {
     const jobs = await readJobsFile();
     const all = Object.values(jobs);
@@ -155,12 +156,12 @@ export async function listJobs({ state } = {}) {
     }
     return jobList;
   } finally {
-    await releaseLock();
+    await releaseLock(JOBS_LOCK_PATH);
   }
 }
 
 export async function retryFromDLQ(id) {
-  await acquireLock();
+  await acquireLock(JOBS_LOCK_PATH);
   let job = null;
   try {
     let jobs = await readJobsFile();
@@ -174,7 +175,7 @@ export async function retryFromDLQ(id) {
     
     await writeJobsFile(jobs);
   } finally {
-    await releaseLock();
+    await releaseLock(JOBS_LOCK_PATH);
   }
   return job;
 }
