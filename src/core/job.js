@@ -1,12 +1,16 @@
 import { randomUUID } from "crypto";
+import { getConfig } from "./configStore.js";
 
 let possible_states = ["pending", "processing", "completed" , "failed", "dead"];
 
-export function createJob(input){
+export async function createJob(input){
     if(!input.command) throw new Error("command is not found");
     
     if(!input.id) input.id = randomUUID();
-    if(input.max_retries === undefined) input.max_retries = 3;
+    if(input.max_retries === undefined){
+        let config = await getConfig();
+        input.max_retries = config.max_retries;
+    } 
 
 
     let job = {

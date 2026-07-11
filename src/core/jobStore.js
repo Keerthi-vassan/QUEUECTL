@@ -2,6 +2,7 @@ import { acquireLock,releaseLock } from "./lock.js";
 import { createJob as buildJob } from "./job.js";
 import {readFile ,writeFile} from "fs/promises"
 import { nextAttemptTimestamp } from "./backoff.js";
+import { getConfig } from "./configStore.js";
 
 const data_path = './data/jobs.json';
 const JOBS_LOCK_PATH = './data/jobs.json.lock'
@@ -33,7 +34,7 @@ export async function createJob(input) {
    await acquireLock(JOBS_LOCK_PATH);
    let new_job;
    try{
-        new_job =  buildJob(input);
+        new_job =  await buildJob(input);
         let jobs = await readJobsFile();
         
         let new_jobs = {...jobs, [new_job.id] : new_job};
@@ -110,9 +111,10 @@ export async function completeJob(id, output){
 }
 
 export async function failJob(id , errorMessage, output){
+    let config = await getConfig();
     await acquireLock(JOBS_LOCK_PATH);
     let job = null;
-    const base = 2;
+    const base = config.backoff_base;
     try{
         let jobs = await readJobsFile()
         job = jobs[id];
