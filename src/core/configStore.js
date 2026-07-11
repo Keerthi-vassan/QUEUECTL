@@ -4,11 +4,12 @@ import { readFile, writeFile } from "fs/promises";
 const CONFIG_PATH = "./data/config.json";
 const CONFIG_LOCK_PATH = "./data/config.json.lock";
 
-const POSSIBLE_CONFIG_KEYS = [ 'max_retries' , 'backoff_base' ];
+const POSSIBLE_CONFIG_KEYS = [ 'max_retries' , 'backoff_base' , 'stale_job_timeout_ms' ];
 
 const DEFAULT_CONFIG = {
   max_retries: 3,
   backoff_base: 2,
+  stale_job_timeout_ms : 60000
 };
 
 async function readConfigFile() {

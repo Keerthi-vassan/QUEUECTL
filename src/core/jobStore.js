@@ -181,3 +181,27 @@ export async function retryFromDLQ(id) {
   }
   return job;
 }
+
+export async function recoverStaleJobs() {
+  const config = await getConfig();
+  const timeoutMs = config.stale_job_timeout_ms;
+  const now = Date.now();
+
+  const processingJobs = await listJobs({ state: 'processing' });
+
+  const staleJobs = processingJobs.filter(job => {
+    const age = now - new Date(job.updated_at).getTime();
+    return age > timeoutMs;
+  });
+
+  const recovered = [];
+  for (const job of staleJobs) {
+    const updated = await failJob(
+      job.id,
+      `Job abandoned: no update for over ${timeoutMs}ms, worker likely crashed`
+    );
+    recovered.push(updated);
+  }
+
+  return recovered;
+}

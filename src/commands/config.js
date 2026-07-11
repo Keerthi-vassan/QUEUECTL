@@ -3,6 +3,7 @@ import { getConfig, setConfigValue } from "../core/configStore.js";
 const KEY_MAP = {
   'max-retries': 'max_retries',
   'backoff-base': 'backoff_base',
+  'stale-job-timeout-ms': 'stale_job_timeout_ms',
 };
 
 export function registerConfigCommand(program) {

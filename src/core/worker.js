@@ -1,6 +1,6 @@
 import { promisify } from "util";
 import { exec as execCallback } from "child_process";
-import { claimJob, completeJob, failJob } from "./jobStore.js";
+import { claimJob, completeJob, failJob, recoverStaleJobs } from "./jobStore.js";
 
 const exec = promisify(execCallback);
 
@@ -36,6 +36,11 @@ process.on('SIGINT' , () => handleShutdown('SIGINT'));
 
 async function mainLoop() {
   console.log(`[${workerId}] started, polling for jobs...`);
+
+  const recovered = await recoverStaleJobs();
+  if(recovered.length > 0){
+    console.log(`[${workerId}] recovered ${recovered.length} stale job(s) : ${recovered.map(j => j.id).join(', ')}`);
+  }
 
   while (!shuttingdown) {
     const job = await claimJob(workerId);
