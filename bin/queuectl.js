@@ -5,6 +5,7 @@ import { registerListCommand } from '../src/commands/list.js';
 import { registerStatusCommand } from '../src/commands/status.js';
 import { registerDlqCommand } from '../src/commands/dlq.js';
 import { registerConfigCommand } from '../src/commands/config.js';
+import { registerWorkerCommand } from '../src/commands/worker.js';
 
 const program = new Command();
 program
@@ -17,5 +18,6 @@ registerListCommand(program);
 registerStatusCommand(program);
 registerDlqCommand(program);
 registerConfigCommand(program);
+registerWorkerCommand(program);
 
 program.parse(process.argv);
