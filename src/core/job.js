@@ -31,6 +31,7 @@ export function validateJob(job){
     if (typeof job.attempts !== 'number' || job.attempts < 0 ) throw new Error("invalid job attempts")
     if(typeof job.max_retries !== 'number' || job.max_retries < 0) throw new Error("max no. of entries is negative");
     if(!possible_states.includes(job.state)) throw new Error("invalid job state");
+    if(job.timeout_ms !== undefined && (typeof job.timeout_ms !== 'number' || job.timeout_ms <= 0)) throw new Error("invalid job timeout_ms");
 
 
 

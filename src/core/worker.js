@@ -16,12 +16,19 @@ async function runJob(job) {
     console.log(`running job`);
     console.log(` id : ${job.id} , command : ${job.command} , status : ${job.state}`);
     try {
-        let res = await exec(job.command);
+        // job.timeout_ms undefined => exec's own default (0, i.e. no timeout) kicks in.
+        let res = await exec(job.command, { timeout: job.timeout_ms });
         await completeJob(job.id , res.stdout.trim());
     } catch (err) {
-        await failJob(job.id, err.message, err.stderr?.trim());
+        // exec kills the child (default SIGTERM) and sets `killed`/`signal` when the
+        // configured timeout elapses, rather than the command exiting on its own -
+        // worth a distinct message since err.message alone doesn't say why it died.
+        const errorMessage = err.killed && job.timeout_ms
+            ? `Job timed out after ${job.timeout_ms}ms (killed via ${err.signal})`
+            : err.message;
+        await failJob(job.id, errorMessage, err.stderr?.trim());
     }
-    
+
     console.log(`finished processing job ${job.id}`);
 }
 
