@@ -1,11 +1,12 @@
-import { startWorkers, stopWorkers } from "../core/workerManager.js";
+import { fork } from 'child_process';
+import { registerWorkers, unregisterWorkers, stopWorkers, WORKER_SCRIPT } from "../core/workerManager.js";
 
 export function registerWorkerCommand(program) {
   const workerCommand = program.command('worker').description('commands related to worker management');
 
   workerCommand
     .command('start')
-    .description('starts 1 worker by default, can start many with --count')
+    .description('starts 1 worker by default, can start many with --count. Runs in the foreground until stopped (Ctrl+C or `worker stop` from another terminal).')
     .option('-c, --count <num>', 'number of workers to start', '1')
     .action(async (options) => {
       const count = Number(options.count);
@@ -15,19 +16,55 @@ export function registerWorkerCommand(program) {
         process.exit(1);
       }
 
+      const children = [];
+      for (let i = 0; i < count; i++) {
+        // No explicit worker-id argv: worker.js defaults to `worker-${process.pid}`
+        // using the *child's own* pid, which keeps the printed label matching the
+        // actual OS process you'd target with `kill`.
+        const child = fork(WORKER_SCRIPT, [], { stdio: 'inherit' });
+        children.push(child);
+      }
+      const pids = children.map((c) => c.pid);
+
       try {
-        const workers = await startWorkers(count);
-        console.log(`Started ${options.count} new worker(s). PIDs:`);
-        workers.forEach(pid => console.log(`  ${pid}`));
+        await registerWorkers(pids);
       } catch (err) {
         console.error(`Error: ${err.message}`);
         process.exit(1);
       }
+
+      console.log(`Started ${count} worker(s). PIDs: ${pids.join(', ')}`);
+      console.log(`Press Ctrl+C to stop gracefully, or run "queuectl worker stop" from another terminal.`);
+
+      let shuttingDown = false;
+      const shutdown = (signal) => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        console.log(`\nReceived ${signal}, signaling worker(s) to finish their current job and stop...`);
+        for (const pid of pids) {
+          try {
+            process.kill(pid, 'SIGTERM');
+          } catch (err) {
+            // already exited — nothing to do
+          }
+        }
+      };
+      process.on('SIGINT', () => shutdown('SIGINT'));
+      process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+      // Blocks the process (keeps it in the foreground) until every worker exits,
+      // whether that's from the signal forwarding above or from a `worker stop`
+      // run in a different terminal signaling these same PIDs directly.
+      await Promise.all(children.map((child) => new Promise((resolve) => child.on('exit', resolve))));
+
+      await unregisterWorkers(pids);
+      console.log('All workers stopped.');
+      process.exit(0);
     });
 
   workerCommand
     .command('stop')
-    .description('stops all currently running workers')
+    .description('stops all currently running workers (can be run from a different terminal than the one running them)')
     .action(async () => {
       try {
         const stoppedCount = await stopWorkers();
