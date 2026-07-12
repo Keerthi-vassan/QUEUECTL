@@ -16,7 +16,7 @@ export async function acquireLock(LOCK_PATH , max_attempts = 10){
         }catch(err){
             if(err.code === 'EEXIST'){
                 let abs_Sleep = Math.min(base_sleep ** attempts, 500) + base_sleep * Math.random();
-                console.log(`${LOCK_PATH} file is aldready locked by some other worker ie.. the lock file aldready exists`);
+                console.error(`${LOCK_PATH} file is aldready locked by some other worker ie.. the lock file aldready exists`);
                 await sleep(abs_Sleep);
                 attempts++;
             }else{
@@ -32,7 +32,7 @@ export async function releaseLock(LOCK_PATH){
         await unlink(LOCK_PATH);
     }catch(err){
         if(err.code === 'ENOENT'){
-            console.log(`the lock ${LOCK_PATH} does not exist or the lock is aldready removed`);
+            console.error(`the lock ${LOCK_PATH} does not exist or the lock is aldready removed`);
         }else{
             throw err;
         }
