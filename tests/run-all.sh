@@ -62,6 +62,13 @@ node tests/test-schedule.js
 
 echo ""
 echo "########################################"
+echo "# 8. Per-attempt history across fail -> DLQ retry -> complete"
+echo "########################################"
+rm -f data/jobs.json data/jobs.json.lock
+node tests/test-history.js
+
+echo ""
+echo "########################################"
 echo "All automated tests completed."
 echo "See README.md 'Testing Instructions' for manual restart-persistence"
 echo "and crash-recovery verification steps."
