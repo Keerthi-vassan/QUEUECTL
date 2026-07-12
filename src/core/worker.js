@@ -6,6 +6,7 @@ const exec = promisify(execCallback);
 
 const workerId = process.argv[2] ?? `worker-${process.pid}`;
 const POLL_INTERVAL_MS = 1000; // how long to wait before re-polling when no job is available
+const RECOVERY_CHECK_INTERVAL_MS = 5000; // how often to check for stale/abandoned jobs
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -37,12 +38,20 @@ process.on('SIGINT' , () => handleShutdown('SIGINT'));
 async function mainLoop() {
   console.log(`[${workerId}] started, polling for jobs...`);
 
-  const recovered = await recoverStaleJobs();
-  if(recovered.length > 0){
-    console.log(`[${workerId}] recovered ${recovered.length} stale job(s) : ${recovered.map(j => j.id).join(', ')}`);
-  }
+  // 0 forces a recovery check on the first loop iteration (same as the old
+  // startup-only check), then throttled to RECOVERY_CHECK_INTERVAL_MS after that
+  // so it doesn't cost a jobs.json lock on every single poll/claim cycle.
+  let lastRecoveryCheck = 0;
 
   while (!shuttingdown) {
+    if (Date.now() - lastRecoveryCheck >= RECOVERY_CHECK_INTERVAL_MS) {
+      lastRecoveryCheck = Date.now();
+      const recovered = await recoverStaleJobs();
+      if (recovered.length > 0) {
+        console.log(`[${workerId}] recovered ${recovered.length} stale job(s) : ${recovered.map(j => j.id).join(', ')}`);
+      }
+    }
+
     const job = await claimJob(workerId);
 
     if (!job) {

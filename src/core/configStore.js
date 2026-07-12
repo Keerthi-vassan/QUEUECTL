@@ -9,7 +9,9 @@ const POSSIBLE_CONFIG_KEYS = [ 'max_retries' , 'backoff_base' , 'stale_job_timeo
 const DEFAULT_CONFIG = {
   max_retries: 3,
   backoff_base: 2,
-  stale_job_timeout_ms : 60000
+  // Worst-case recovery = stale_job_timeout_ms + recovery check interval (see worker.js).
+  // Kept comfortably under PRD's 60s requirement with default settings.
+  stale_job_timeout_ms : 45000
 };
 
 async function readConfigFile() {
@@ -33,7 +35,6 @@ async function writeConfigFile(config) {
 }
 
 export async function getConfig() {
-  // TODO: lock, read, release, return. Same shape as getJob but no id needed.
   await acquireLock(CONFIG_LOCK_PATH);
   try{
     let config = await readConfigFile();
@@ -44,9 +45,6 @@ export async function getConfig() {
 }
 
 export async function setConfigValue(key, value) {
-  // TODO: lock, read existing config, merge in the new key/value, write, release, return updated config.
-  // Think about: should this validate that `key` is one of the known config keys
-  // (max_retries, backoff_base)? What happens if someone runs `config set typo_key 5`?
   if(!POSSIBLE_CONFIG_KEYS.includes(key)) throw new Error(`the give config key ${key} is invalid`);
   if(typeof(value) !== 'number' || value < 0) throw new Error(`the given value ${value} for the key ${key} is invalid , (should be an positive integer)`);
   await acquireLock(CONFIG_LOCK_PATH);
