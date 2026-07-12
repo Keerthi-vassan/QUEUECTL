@@ -1,7 +1,13 @@
 import { readFile, writeFile } from 'fs/promises';
-import { acquireLock, releaseLock } from './lock.js';
+import { acquireLock, releaseLock, sleep } from './lock.js';
 
 export const WORKER_SCRIPT = './src/core/worker.js';
+
+// How long to wait for a SIGTERM'd worker to exit on its own (e.g. finishing an
+// in-flight job) before escalating to SIGKILL. Shared by `worker stop` and
+// `worker start`'s own Ctrl+C handler so both escalate on the same deadline.
+export const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 10000;
+const STOP_POLL_INTERVAL_MS = 200;
 
 const WORKERS_PATH = './data/workers.json';
 const WORKERS_LOCK_PATH = './data/workers.json.lock';
@@ -77,7 +83,7 @@ export async function getActiveWorkerPids() {
 
 export async function stopWorkers() {
   await acquireLock(WORKERS_LOCK_PATH);
-  let count = 0;
+  let signaled = [];
   try {
     let obj = await readWorkersFile();
     let workers = obj.workers;
@@ -85,8 +91,8 @@ export async function stopWorkers() {
     workers.forEach((pid) => {
       try {
         process.kill(pid, 'SIGTERM');
-        console.log(`worker ${pid} killed`);
-        count++;
+        console.log(`worker ${pid} signaled to stop`);
+        signaled.push(pid);
       } catch (err) {
         if (err.code === 'ESRCH') {
           console.log(`worker ${pid} is already stopped`);
@@ -100,5 +106,26 @@ export async function stopWorkers() {
   } finally {
     await releaseLock(WORKERS_LOCK_PATH);
   }
-  return count;
+
+  // Poll outside the lock (this can take up to GRACEFUL_SHUTDOWN_TIMEOUT_MS -
+  // no reason to block other workers.json operations while we wait). Anything
+  // still alive after the deadline (e.g. stuck in a job with no timeout_ms
+  // that's ignoring SIGTERM) gets force-killed directly.
+  const deadline = Date.now() + GRACEFUL_SHUTDOWN_TIMEOUT_MS;
+  let stillAlive = signaled.filter(isAlive);
+  while (stillAlive.length > 0 && Date.now() < deadline) {
+    await sleep(STOP_POLL_INTERVAL_MS);
+    stillAlive = stillAlive.filter(isAlive);
+  }
+
+  for (const pid of stillAlive) {
+    try {
+      process.kill(pid, 'SIGKILL');
+      console.log(`worker ${pid} did not exit within ${GRACEFUL_SHUTDOWN_TIMEOUT_MS}ms, force-killed`);
+    } catch (err) {
+      // already exited between the last isAlive check and here
+    }
+  }
+
+  return signaled.length;
 }

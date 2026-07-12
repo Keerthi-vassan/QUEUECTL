@@ -1,5 +1,5 @@
 import { fork } from 'child_process';
-import { registerWorkers, unregisterWorkers, stopWorkers, WORKER_SCRIPT } from "../core/workerManager.js";
+import { registerWorkers, unregisterWorkers, stopWorkers, WORKER_SCRIPT, GRACEFUL_SHUTDOWN_TIMEOUT_MS } from "../core/workerManager.js";
 
 export function registerWorkerCommand(program) {
   const workerCommand = program.command('worker').description('commands related to worker management');
@@ -48,13 +48,27 @@ export function registerWorkerCommand(program) {
             // already exited — nothing to do
           }
         }
+
+        // Only armed once a shutdown was actually requested - the timer starts
+        // from here, not from process launch, so a worker running normally is
+        // never at risk of this firing on its own.
+        setTimeout(() => {
+          console.log(`Worker(s) did not exit within ${GRACEFUL_SHUTDOWN_TIMEOUT_MS}ms, force-killing...`);
+          for (const child of children) {
+            if (child.exitCode === null && child.signalCode === null) {
+              child.kill('SIGKILL');
+            }
+          }
+        }, GRACEFUL_SHUTDOWN_TIMEOUT_MS).unref();
       };
       process.on('SIGINT', () => shutdown('SIGINT'));
       process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-      // Blocks the process (keeps it in the foreground) until every worker exits,
-      // whether that's from the signal forwarding above or from a `worker stop`
-      // run in a different terminal signaling these same PIDs directly.
+      // Blocks the process (keeps it in the foreground) indefinitely until every
+      // worker exits - whether that's from the signal forwarding above (which
+      // also arms the force-kill escalation timer in shutdown()) or from a
+      // `worker stop` run in a different terminal signaling these same PIDs
+      // directly (that path has its own independent escalation in stopWorkers).
       await Promise.all(children.map((child) => new Promise((resolve) => child.on('exit', resolve))));
 
       await unregisterWorkers(pids);

@@ -41,6 +41,11 @@ queuectl worker start --count 3  # 3 workers, foreground
 
 Runs in the foreground and blocks until stopped. `Ctrl+C` (or `SIGTERM`)
 triggers a graceful shutdown: each worker finishes its current job, then exits.
+If a worker doesn't exit within 10 seconds (e.g. stuck running a command with
+no `timeout_ms` that isn't responding to `SIGTERM`), it's force-killed —
+shutdown always completes, but a force-killed job is left stuck in
+`processing` until stale-job recovery routes it back through a retry (see
+`DECISIONS.md` Q2 and Q4).
 
 From a **different terminal**, while workers are running:
 
@@ -48,9 +53,10 @@ From a **different terminal**, while workers are running:
 queuectl worker stop
 ```
 
-Signals every currently-tracked worker to shut down gracefully. The terminal
-running `worker start` will print the shutdown sequence and exit on its own
-once all workers have stopped.
+Signals every currently-tracked worker to shut down gracefully, waiting up to
+10 seconds per worker before force-killing anything still running. The
+terminal running `worker start` will print the shutdown sequence and exit on
+its own once all workers have stopped.
 
 ### Check status
 
@@ -123,11 +129,13 @@ keep the values they were created/failed with.
 bash tests/run-all.sh
 ```
 
-Runs the full suite (lock mutual exclusion, concurrent claim safety, a basic
-job completing, invalid-command handling, and the full
-pending→failed→dead lifecycle), cleaning `data/*.json` between each test and
-stopping on first failure. Individual tests can also be run directly, e.g.
-`node tests/test-basic.js`.
+Runs the full suite: lock mutual exclusion, concurrent claim safety, a basic
+job completing, invalid-command handling, the full pending→failed→dead
+lifecycle, job timeouts (`timeout_ms` killing a long-running command),
+scheduled jobs (`run_at` delaying eligibility), and per-attempt history
+surviving a fail → DLQ retry → complete cycle. Cleans `data/*.json` between
+each test and stops on first failure. Individual tests can also be run
+directly, e.g. `node tests/test-basic.js` or `node tests/test-timeout.js`.
 
 ### Manual scenarios
 
