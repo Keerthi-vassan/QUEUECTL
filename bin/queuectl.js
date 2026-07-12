@@ -6,6 +6,7 @@ import { registerStatusCommand } from '../src/commands/status.js';
 import { registerDlqCommand } from '../src/commands/dlq.js';
 import { registerConfigCommand } from '../src/commands/config.js';
 import { registerWorkerCommand } from '../src/commands/worker.js';
+import { registerLogsCommand } from '../src/commands/logs.js';
 
 const program = new Command();
 program
@@ -19,5 +20,6 @@ registerStatusCommand(program);
 registerDlqCommand(program);
 registerConfigCommand(program);
 registerWorkerCommand(program);
+registerLogsCommand(program);
 
 program.parse(process.argv);

@@ -103,6 +103,12 @@ export async function completeJob(id, output){
             job.output = output;
         }
 
+        job.history = [...(job.history ?? []), {
+            attempt: job.attempts + 1,
+            state: 'completed',
+            output,
+            at: job.updated_at,
+        }];
 
         let new_jobs = {...jobs , [job.id] : job};
         await writeJobsFile(new_jobs);
@@ -138,6 +144,14 @@ export async function failJob(id , errorMessage, output){
         if (output !== undefined) {
             job.output = output;
         }
+
+        job.history = [...(job.history ?? []), {
+            attempt: job.attempts,
+            state: job.state,
+            error: errorMessage,
+            output,
+            at: job.updated_at,
+        }];
 
         let new_jobs = {...jobs , [job.id] : job};
         await writeJobsFile(new_jobs);
@@ -177,7 +191,14 @@ export async function retryFromDLQ(id) {
     job.attempts = 0;
     delete job.next_attempt;
     job.updated_at = new Date().toISOString();
-    
+
+    // Marks the reset point in history - attempt numbers start over from 1
+    // after this, since `attempts` itself was just reset.
+    job.history = [...(job.history ?? []), {
+        state: 'retried',
+        at: job.updated_at,
+    }];
+
     await writeJobsFile(jobs);
   } finally {
     await releaseLock(JOBS_LOCK_PATH);
