@@ -67,7 +67,10 @@ export async function claimJob(workerId){
         let jobs = await readJobsFile();
         let jobsList = Object.values(jobs);
 
-        let currJob = jobsList.find(job => job.state === 'pending' || job.state ==='failed' && new Date(job.next_attempt).getTime()  <= now);
+        let currJob = jobsList.find(job =>
+            (job.state === 'pending' && (!job.run_at || new Date(job.run_at).getTime() <= now)) ||
+            (job.state === 'failed' && new Date(job.next_attempt).getTime() <= now)
+        );
 
         if(!currJob) return null;
 

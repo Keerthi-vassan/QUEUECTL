@@ -32,6 +32,7 @@ export function validateJob(job){
     if(typeof job.max_retries !== 'number' || job.max_retries < 0) throw new Error("max no. of entries is negative");
     if(!possible_states.includes(job.state)) throw new Error("invalid job state");
     if(job.timeout_ms !== undefined && (typeof job.timeout_ms !== 'number' || job.timeout_ms <= 0)) throw new Error("invalid job timeout_ms");
+    if(job.run_at !== undefined && (typeof job.run_at !== 'string' || Number.isNaN(new Date(job.run_at).getTime()))) throw new Error("invalid job run_at (must be an ISO date string)");
 
 
 

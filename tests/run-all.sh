@@ -48,6 +48,20 @@ node tests/test-lifecycle.js
 
 echo ""
 echo "########################################"
+echo "# 6. Job timeout: long-running command gets killed"
+echo "########################################"
+rm -f data/jobs.json data/jobs.json.lock
+node tests/test-timeout.js
+
+echo ""
+echo "########################################"
+echo "# 7. Scheduled jobs: run_at delays eligibility"
+echo "########################################"
+rm -f data/jobs.json data/jobs.json.lock
+node tests/test-schedule.js
+
+echo ""
+echo "########################################"
 echo "All automated tests completed."
 echo "See README.md 'Testing Instructions' for manual restart-persistence"
 echo "and crash-recovery verification steps."
