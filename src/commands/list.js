@@ -10,14 +10,19 @@ export function registerListCommand(program) {
       let jobs = await listJobs({state : options.state});
 
       if (options.json) {
-        console.log(JSON.stringify(jobs));
+        console.log(JSON.stringify(jobs, null, 2));
         return;
       }
 
       if (jobs.length === 0) console.log("no jobs found");
       else {
+        const idWidth = Math.max(...jobs.map((j) => j.id.length));
         jobs.forEach((j) => {
-          console.log(` ${j.id} ${j.state.padEnd(10)} ${j.command} `);
+            if(j.workerId){
+                console.log(` ${j.id.padEnd(idWidth)}     ${j.state.padEnd(10)}   ${j.command}   ${j.workerId}`);
+            }else{
+                console.log(` ${j.id.padEnd(idWidth)}     ${j.state.padEnd(10)}   ${j.command}`);
+            }
         });
       }
     });
