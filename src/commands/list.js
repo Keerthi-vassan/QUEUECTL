@@ -17,9 +17,10 @@ export function registerListCommand(program) {
       if (jobs.length === 0) console.log("no jobs found");
       else {
         const idWidth = Math.max(...jobs.map((j) => j.id.length));
+        console.log(` ${"ID".padEnd(idWidth)}     ${"STATE".padEnd(10)}   COMMAND   WORKER`);
         jobs.forEach((j) => {
-            if(j.workerId){
-                console.log(` ${j.id.padEnd(idWidth)}     ${j.state.padEnd(10)}   ${j.command}   ${j.workerId}`);
+            if(j.worker_id){
+                console.log(` ${j.id.padEnd(idWidth)}     ${j.state.padEnd(10)}   ${j.command}   ${j.worker_id}`);
             }else{
                 console.log(` ${j.id.padEnd(idWidth)}     ${j.state.padEnd(10)}   ${j.command}`);
             }
